@@ -189,6 +189,21 @@ cargo run -p veil -- start --foreground   # 控制面可用，但访问 UI 返�
 
 由 [.github/workflows/release.yml](.github/workflows/release.yml) 在推送 `v*` tag 时完成：前端 `npm ci && npm run build` → 后端 `cargo build --release -p veil --target <target>` → 拷贝到 `dist/<asset>` → 汇总生成 `SHA256SUMS` → 上传 GitHub Release。
 
+#### 5.1.1 发版脚本（推荐）
+
+[scripts/release.sh](scripts/release.sh) 把「改版本号 → 提交 → 打 tag → 推送」串成一步，推送后 CI 自动完成多平台构建与 Release 上传。
+
+```bash
+scripts/release.sh 0.3.15           # 改版本、提交、打 tag、推送（触发 CI）
+scripts/release.sh 0.3.15 --no-push # 只到打 tag，不推送
+```
+
+脚本自动改三处版本号（[Cargo.toml](Cargo.toml) workspace 根版本、[ui/package.json](ui/package.json)、[RELEASE_NOTES.md](RELEASE_NOTES.md) 的标题与 `gh release download` 行），并在推送前二次确认——因为推送 `v*` tag 会触发 CI 公开发布，不可撤销。[RELEASE_NOTES.md](RELEASE_NOTES.md) 的正文（Added/Update 等条目）需手动维护。
+
+#### 5.1.2 手动发版
+
+若不用脚本，手动执行：
+
 ```bash
 git tag v0.3.15
 git push origin v0.3.15
@@ -308,7 +323,7 @@ veil update --check               # 检查 GitHub 最新 release
 | 本地 release 包 | `npm run build`(ui) → `cargo build --release -p veil` |
 | 本地产物分发 | 单文件 `veil(.exe)` 直接发，单平台自包含（见 [3.1](#31-产物分发单文件即可用)） |
 | Windows EPERM unlink | 查 `tasklist \| grep esbuild` → `taskkill //F //IM esbuild.exe`（见 [3.3](#33-windows-文件锁eperm-unlink排查)） |
-| 正式多平台发布 | `git push origin v<ver>` 触发 CI |
+| 正式多平台发布 | `scripts/release.sh <ver>` 一键改版本+打 tag+推送触发 CI（见 [5.1.1](#511-发版脚本推荐)） |
 | CI 产物各平台使用 | 按 [5.3 表](#53-ci-release-产物各平台怎么用) 选对应平台单文件下载即用 |
 | 启动服务 | `veil` / `veil start --foreground` |
 | 停止 / 状态 | `veil stop` / `veil status` |
