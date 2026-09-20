@@ -1,0 +1,437 @@
+use std::path::{Path, PathBuf};
+
+use rand::RngCore;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
+use crate::master_key::create_secret_file;
+use crate::Error;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Mode {
+    #[default]
+    Desktop,
+    Server,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RuleSource {
+    #[default]
+    Builtin,
+    Custom,
+}
+
+/// Serde-friendly rule row stored in `config.toml`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RuleConfig {
+    pub id: String,
+    pub type_prefix: String,
+    #[serde(default = "bool_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub priority: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub words: Option<Vec<String>>,
+    #[serde(default)]
+    pub source: RuleSource,
+}
+
+fn bool_true() -> bool {
+    true
+}
+
+/// One coding app → one local port → one (often custom) upstream.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ClientRoute {
+    pub id: String,
+    pub label: String,
+    /// anthropic | openai | auto
+    pub kind: String,
+    pub port: u16,
+    pub upstream: String,
+}
+
+impl Default for ClientRoute {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            label: String::new(),
+            kind: "auto".into(),
+            port: 18791,
+            upstream: String::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Config {
+    #[serde(default)]
+    pub revision: u64,
+    pub bind: String,
+    pub proxy_port: u16,
+    pub management_port: u16,
+    pub mode: Mode,
+    pub anthropic_upstream: String,
+    pub openai_completions_upstream: String,
+    pub openai_responses_upstream: String,
+    /// Empty means always connect directly and ignore system/environment proxies.
+    #[serde(default)]
+    pub upstream_proxy: String,
+    pub request_body_limit_mib: u64,
+    pub mapping_ttl_days: u64,
+    pub mapping_cap_per_creator: u64,
+    /// Max seconds to wait for in-flight requests during data-plane graceful
+    /// shutdown before aborting. Default 5; design §7 allows later config.
+    #[serde(default = "default_graceful_shutdown_timeout_secs")]
+    pub graceful_shutdown_timeout_secs: u64,
+    pub admin_token_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_cert_path: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_key_path: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saved_client_anthropic_base_url: Option<String>,
+    #[serde(default)]
+    pub routes: Vec<ClientRoute>,
+    #[serde(default)]
+    pub rules: Vec<RuleConfig>,
+    #[serde(default = "default_allowlist")]
+    pub allowlist: Vec<String>,
+    /// Optional prompt injection (off by default).
+    #[serde(default)]
+    pub alias_hint: bool,
+}
+
+fn default_allowlist() -> Vec<String> {
+    vec![
+        "127.0.0.1".to_string(),
+        "localhost".to_string(),
+        "0.0.0.0".to_string(),
+        "::1".to_string(),
+    ]
+}
+
+fn default_graceful_shutdown_timeout_secs() -> u64 {
+    5
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            revision: 0,
+            bind: "127.0.0.1".to_string(),
+            proxy_port: 18787,
+            management_port: 18788,
+            mode: Mode::Desktop,
+            anthropic_upstream: "https://api.anthropic.com".to_string(),
+            openai_completions_upstream: "https://api.openai.com".to_string(),
+            openai_responses_upstream: "https://api.openai.com".to_string(),
+            upstream_proxy: String::new(),
+            request_body_limit_mib: 32,
+            mapping_ttl_days: 90,
+            mapping_cap_per_creator: 100_000,
+            graceful_shutdown_timeout_secs: 5,
+            admin_token_hash: String::new(),
+            tls_cert_path: None,
+            tls_key_path: None,
+            saved_client_anthropic_base_url: None,
+            routes: Vec::new(),
+            rules: Vec::new(),
+            allowlist: default_allowlist(),
+            alias_hint: false,
+        }
+    }
+}
+
+impl Config {
+    pub fn load(data_dir: &Path) -> Result<Self, Error> {
+        std::fs::create_dir_all(data_dir)?;
+        let path = data_dir.join("config.toml");
+        let mut cfg = if path.exists() {
+            let text = std::fs::read_to_string(&path)?;
+            toml::from_str(&text)?
+        } else {
+            Config::default()
+        };
+
+        let mut dirty = !path.exists();
+        if cfg.admin_token_hash.is_empty() {
+            let token = generate_admin_token();
+            cfg.admin_token_hash = hex::encode(Sha256::digest(token.as_bytes()));
+            let token_path = data_dir.join("admin.token");
+            match create_secret_file(&token_path, token.as_bytes()) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    // Another first-start won the create_new race — load theirs.
+                    let existing = std::fs::read_to_string(&token_path)?;
+                    cfg.admin_token_hash = hex::encode(Sha256::digest(existing.trim().as_bytes()));
+                }
+                Err(e) => return Err(e.into()),
+            }
+            dirty = true;
+        }
+        if dirty {
+            cfg.save(data_dir)?;
+        }
+
+        apply_env_overrides(&mut cfg);
+        cfg.clamp();
+        cfg.validate()?;
+        Ok(cfg)
+    }
+
+    pub fn save(&self, data_dir: &Path) -> Result<(), Error> {
+        std::fs::create_dir_all(data_dir)?;
+        let mut to_write = self.clone();
+        to_write.clamp();
+        to_write.validate()?;
+        let text = toml::to_string_pretty(&to_write)?;
+        std::fs::write(data_dir.join("config.toml"), text)?;
+        Ok(())
+    }
+
+    pub fn next_route_port(&self) -> u16 {
+        let mut used = vec![self.proxy_port, self.management_port];
+        used.extend(self.routes.iter().map(|r| r.port));
+        (18791u16..18850)
+            .find(|p| !used.contains(p))
+            .unwrap_or(18791)
+    }
+
+    pub fn upsert_route(
+        &mut self,
+        id: &str,
+        label: &str,
+        kind: &str,
+        upstream: &str,
+    ) -> ClientRoute {
+        if let Some(existing) = self.routes.iter_mut().find(|r| r.id == id) {
+            existing.label = label.into();
+            existing.kind = kind.into();
+            if !upstream.is_empty() {
+                existing.upstream = upstream.into();
+            }
+            return existing.clone();
+        }
+        let route = ClientRoute {
+            id: id.into(),
+            label: label.into(),
+            kind: kind.into(),
+            port: self.next_route_port(),
+            upstream: upstream.into(),
+        };
+        self.routes.push(route.clone());
+        route
+    }
+
+    fn clamp(&mut self) {
+        self.request_body_limit_mib = self.request_body_limit_mib.min(128);
+    }
+
+    pub fn validate(&self) -> Result<(), Error> {
+        let proxy = self.upstream_proxy.trim();
+        if !proxy.is_empty() {
+            let url = reqwest::Url::parse(proxy)
+                .map_err(|e| Error::Config(format!("invalid upstream_proxy: {e}")))?;
+            if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
+                return Err(Error::Config(
+                    "upstream_proxy must be an http(s) URL with a host".into(),
+                ));
+            }
+        }
+
+        let mut ports = std::collections::HashSet::new();
+        for (label, port) in std::iter::once(("proxy_port", self.proxy_port))
+            .chain(std::iter::once(("management_port", self.management_port)))
+            .chain(self.routes.iter().map(|r| (r.id.as_str(), r.port)))
+        {
+            if port == 0 {
+                return Err(Error::Config(format!(
+                    "{label} must be between 1 and 65535"
+                )));
+            }
+            if !ports.insert(port) {
+                return Err(Error::Config(format!(
+                    "listener port {port} is configured more than once"
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn env_mode() -> Option<Mode> {
+    let raw = crate::env::var("MODE").ok()?;
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "server" => Some(Mode::Server),
+        "desktop" => Some(Mode::Desktop),
+        _ => None,
+    }
+}
+
+fn apply_env_overrides(cfg: &mut Config) {
+    if let Ok(bind) = crate::env::var("BIND") {
+        let bind = bind.trim();
+        if !bind.is_empty() {
+            cfg.bind = bind.to_string();
+        }
+    }
+    if let Some(mode) = env_mode() {
+        cfg.mode = mode;
+    }
+    if let Ok(proxy) = crate::env::var("UPSTREAM_PROXY") {
+        cfg.upstream_proxy = proxy.trim().to_string();
+    }
+}
+
+pub(crate) fn generate_admin_token() -> String {
+    let mut bytes = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    hex::encode(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Config;
+    use super::Mode;
+    use crate::test_env::EnvLock;
+    use sha2::{Digest, Sha256};
+
+    #[test]
+    fn config_toml_roundtrip_defaults() {
+        let cfg = Config::default();
+        let text = toml::to_string_pretty(&cfg).unwrap();
+        let back: Config = toml::from_str(&text).unwrap();
+        assert_eq!(back.proxy_port, 18787);
+        assert_eq!(back.management_port, 18788);
+        assert_eq!(back.anthropic_upstream, "https://api.anthropic.com");
+        assert_eq!(back.openai_completions_upstream, "https://api.openai.com");
+        assert_eq!(back.openai_responses_upstream, "https://api.openai.com");
+        assert!(back.upstream_proxy.is_empty());
+        assert_eq!(back.mapping_ttl_days, 90);
+        assert_eq!(back.request_body_limit_mib, 32);
+        assert_eq!(back.bind, "127.0.0.1");
+        assert_eq!(back.mapping_cap_per_creator, 100_000);
+    }
+
+    #[test]
+    fn each_app_gets_its_own_port() {
+        let mut cfg = Config::default();
+        let a = cfg.upsert_route(
+            "claude",
+            "Claude Code",
+            "anthropic",
+            "https://relay-a.example",
+        );
+        let b = cfg.upsert_route("codex", "Codex", "openai", "https://relay-b.example");
+        assert_eq!(a.port, 18791);
+        assert_eq!(b.port, 18792);
+        assert_ne!(a.upstream, b.upstream);
+        let a2 = cfg.upsert_route(
+            "claude",
+            "Claude Code",
+            "anthropic",
+            "https://relay-a2.example",
+        );
+        assert_eq!(a2.port, 18791);
+        assert_eq!(a2.upstream, "https://relay-a2.example");
+    }
+
+    #[test]
+    fn config_load_save_roundtrip_and_env_overrides() {
+        let mut env = EnvLock::acquire();
+        env.unset("VEIL_BIND");
+        env.unset("DGW_BIND");
+        env.unset("VEIL_MODE");
+        env.unset("VEIL_MODE");
+        env.unset("DGW_MODE");
+        env.unset("VEIL_UPSTREAM_PROXY");
+        env.unset("DGW_UPSTREAM_PROXY");
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = Config::load(dir.path()).unwrap();
+        assert_eq!(cfg.proxy_port, 18787);
+        assert_eq!(cfg.management_port, 18788);
+        assert_eq!(cfg.bind, "127.0.0.1");
+        assert!(dir.path().join("config.toml").exists());
+
+        env.set("VEIL_BIND", "10.0.0.5");
+        env.set("VEIL_MODE", "server");
+        env.set("VEIL_UPSTREAM_PROXY", "http://127.0.0.1:7890");
+        let overridden = Config::load(dir.path()).unwrap();
+        assert_eq!(overridden.bind, "10.0.0.5");
+        assert_eq!(overridden.mode, super::Mode::Server);
+        assert_eq!(overridden.upstream_proxy, "http://127.0.0.1:7890");
+    }
+
+    #[test]
+    fn invalid_proxy_and_duplicate_ports_are_rejected() {
+        let mut cfg = Config::default();
+        cfg.upstream_proxy = "not a url".into();
+        assert!(cfg
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("upstream_proxy"));
+
+        cfg.upstream_proxy.clear();
+        cfg.management_port = cfg.proxy_port;
+        assert!(cfg
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("more than once"));
+    }
+
+    #[test]
+    fn desktop_first_start_writes_admin_token() {
+        let mut env = EnvLock::acquire();
+        env.unset("VEIL_MODE");
+        env.unset("DGW_MODE");
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = Config::load(dir.path()).unwrap();
+        assert_eq!(cfg.admin_token_hash.len(), 64);
+        let token = std::fs::read_to_string(dir.path().join("admin.token")).unwrap();
+        let token = token.trim();
+        let hash = hex::encode(Sha256::digest(token.as_bytes()));
+        assert_eq!(hash, cfg.admin_token_hash);
+        let again = Config::load(dir.path()).unwrap();
+        assert_eq!(again.admin_token_hash, cfg.admin_token_hash);
+    }
+
+    #[test]
+    fn server_mode_also_auto_generates_admin_token() {
+        let mut env = EnvLock::acquire();
+        env.set("VEIL_MODE", "server");
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = Config::load(dir.path()).unwrap();
+        assert_eq!(cfg.mode, Mode::Server);
+        assert_eq!(
+            cfg.admin_token_hash.len(),
+            64,
+            "server mode must also bootstrap an admin token when none is set"
+        );
+        assert!(dir.path().join("admin.token").exists());
+        env.unset("VEIL_MODE");
+    }
+
+    #[test]
+    fn request_body_limit_clamped_to_128() {
+        let mut env = EnvLock::acquire();
+        env.unset("VEIL_MODE");
+        env.unset("DGW_MODE");
+        let dir = tempfile::tempdir().unwrap();
+        let mut cfg = Config::default();
+        cfg.request_body_limit_mib = 999;
+        cfg.save(dir.path()).unwrap();
+        assert_eq!(
+            Config::load(dir.path()).unwrap().request_body_limit_mib,
+            128
+        );
+    }
+}

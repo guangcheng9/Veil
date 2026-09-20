@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "command": "node scripts/veil.mjs start",
+        "once": true
+      }
+    ]
+  }
+}
