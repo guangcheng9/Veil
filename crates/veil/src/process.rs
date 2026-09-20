@@ -198,7 +198,10 @@ pub fn describe_port_owner(port: u16) -> String {
 ///   condition 5 treats "API unresponsive" as satisfying the recovery gate.
 /// - `Some(id)`: API responded; `id` must equal `meta.instance_id`, otherwise
 ///   the port owner is a *different* Veil instance and must not be killed.
-pub fn terminate_confirmed(meta: &RuntimeMetadata, api_instance_id: Option<&str>) -> Result<bool, Error> {
+pub fn terminate_confirmed(
+    meta: &RuntimeMetadata,
+    api_instance_id: Option<&str>,
+) -> Result<bool, Error> {
     if meta.instance_id.is_empty()
         || meta.process_started_at == 0
         || meta.listener_ports.is_empty()

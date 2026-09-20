@@ -370,5 +370,8 @@ async fn route_port_change_via_put_upstream_is_rejected() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     let body = resp.text().await.unwrap();
-    assert!(body.contains("veil setup"), "expected setup hint, got: {body}");
+    assert!(
+        body.contains("veil setup"),
+        "expected setup hint, got: {body}"
+    );
 }
