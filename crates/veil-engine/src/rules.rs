@@ -17,6 +17,8 @@ pub struct Rule {
     pub timeout_ms: u64,
     /// Original regex source, when `matcher` is regex.
     pub pattern: Option<String>,
+    /// Human-readable note shown in the admin UI; metadata only, not used for matching.
+    pub description: Option<String>,
 }
 
 /// How a rule locates candidate spans in plaintext.
@@ -76,6 +78,7 @@ impl Rule {
             priority,
             timeout_ms: DEFAULT_TIMEOUT_MS,
             pattern: Some(pattern.to_string()),
+            description: None,
         }
     }
 
@@ -96,6 +99,7 @@ impl Rule {
             priority,
             timeout_ms: DEFAULT_TIMEOUT_MS,
             pattern: None,
+            description: None,
         }
     }
 
@@ -121,6 +125,12 @@ impl Rule {
         self
     }
 
+    /// Attach a human-readable description surfaced in the admin UI.
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
     /// Parse-based IPv4/IPv6 matcher.
     pub fn ip(id: impl Into<String>, type_prefix: impl Into<String>, priority: i32) -> Self {
         let id = id.into();
@@ -134,6 +144,7 @@ impl Rule {
             priority,
             timeout_ms: DEFAULT_TIMEOUT_MS,
             pattern: None,
+            description: None,
         }
     }
 }
@@ -421,6 +432,7 @@ mod tests {
             priority: 1,
             timeout_ms: DEFAULT_TIMEOUT_MS,
             pattern: None,
+            description: None,
         };
         let phone = Rule::regex("phone", "PHONE", r"1[3-9]\d{9}", 50);
         let set = ruleset(vec![evil, phone]);

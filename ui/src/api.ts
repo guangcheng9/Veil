@@ -7,6 +7,7 @@ export type RuleView = {
   source: string;
   pattern?: string | null;
   words?: string[] | null;
+  description?: string | null;
 };
 
 export type TrafficEvent = {

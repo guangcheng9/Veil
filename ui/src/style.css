@@ -150,7 +150,8 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
   display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; width: 100%;
   background: transparent; border: 0; color: inherit; font: inherit; text-align: left;
 }
-.rule-head .meta { margin-left: auto; color: var(--muted); font-size: 12px; }
+.rule-head .meta { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.rule-head .desc { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%; }
 .rule-body { padding: 0 14px 14px; border-top: 1px solid var(--border); }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .iconbtn { background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; cursor: pointer; color: inherit; }

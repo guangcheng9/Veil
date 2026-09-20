@@ -158,6 +158,7 @@ const STR = {
     deleteRule: "Delete",
     words: "dictionary words (one per line)",
     builtinHint: "Built-in IP matching has no regex — it parses every IPv4/IPv6 token. You can still disable it.",
+    colDesc: "description",
   },
   zh: {
     tagline: "门口一道纱帘",
@@ -314,6 +315,7 @@ const STR = {
     deleteRule: "删除",
     words: "词表（一行一个）",
     builtinHint: "内置 IP 规则没有正则，它会解析每一个 IPv4/IPv6。仍可以关掉。",
+    colDesc: "说明",
   },
 } as const;
 

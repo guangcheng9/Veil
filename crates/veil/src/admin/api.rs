@@ -115,6 +115,7 @@ struct RuleView {
     source: String,
     pattern: Option<String>,
     words: Option<Vec<String>>,
+    description: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -152,6 +153,7 @@ pub async fn get_rules(State(state): State<AdminState>, headers: HeaderMap) -> i
                 source: String::from("builtin"),
                 pattern: r.pattern.clone(),
                 words: r.words().map(|w| w.to_vec()),
+                description: r.description.clone(),
             })
             .collect();
         return Json(RulesBody {
@@ -160,25 +162,39 @@ pub async fn get_rules(State(state): State<AdminState>, headers: HeaderMap) -> i
         })
         .into_response();
     }
+    // Built-in descriptions, keyed by rule id, so that saved config rows
+    // authored before the description field existed still surface their
+    // built-in blurb instead of appearing blank.
+    let builtin = builtin_ruleset();
+    let builtin_desc: std::collections::HashMap<&str, &str> = builtin
+        .rules()
+        .iter()
+        .filter_map(|r| r.description.as_deref().map(|d| (r.id.as_str(), d)))
+        .collect();
     let views: Vec<RuleView> = cfg
         .rules
         .into_iter()
-        .map(|r| RuleView {
-            id: r.id,
-            type_prefix: r.type_prefix,
-            enabled: r.enabled,
-            priority: r.priority,
-            kind: if r.words.as_ref().is_some_and(|w| !w.is_empty()) {
-                String::from("dictionary")
-            } else {
-                String::from("regex")
-            },
-            source: match r.source {
-                RuleSource::Builtin => String::from("builtin"),
-                RuleSource::Custom => String::from("custom"),
-            },
-            pattern: r.pattern,
-            words: r.words,
+        .map(|r| {
+            let id = r.id.clone();
+            let fallback = builtin_desc.get(id.as_str()).map(|d| (*d).to_string());
+            RuleView {
+                id,
+                type_prefix: r.type_prefix,
+                enabled: r.enabled,
+                priority: r.priority,
+                kind: if r.words.as_ref().is_some_and(|w| !w.is_empty()) {
+                    String::from("dictionary")
+                } else {
+                    String::from("regex")
+                },
+                source: match r.source {
+                    RuleSource::Builtin => String::from("builtin"),
+                    RuleSource::Custom => String::from("custom"),
+                },
+                pattern: r.pattern,
+                words: r.words,
+                description: r.description.or(fallback),
+            }
         })
         .collect();
     Json(RulesBody {

@@ -11,6 +11,7 @@ export default function RulesPage() {
   const [nid, setNid] = useState("custom1");
   const [ntp, setNtp] = useState("CUSTOM");
   const [npat, setNpat] = useState("");
+  const [ndesc, setNdesc] = useState("");
   const [rulesRev, setRulesRev] = useState(0);
   const [allowRev, setAllowRev] = useState(0);
   const load = () => {
@@ -45,6 +46,7 @@ export default function RulesPage() {
             <strong>{r.id}</strong>
             <span className="chip">{r.type_prefix}</span>
             <span className="meta">{r.kind} · prio {r.priority} · {r.source}</span>
+            {r.description && <span className="desc">{r.description}</span>}
           </div>
           {open === r.id && (
             <div className="rule-body">
@@ -53,6 +55,7 @@ export default function RulesPage() {
                 <div className="field"><label>{t.colType}</label><input value={r.type_prefix} onChange={(e) => setRules(rules.map((x) => x.id === r.id ? { ...x, type_prefix: e.target.value } : x))} /></div>
                 <div className="field"><label>{t.colPrio}</label><input type="number" value={r.priority} onChange={(e) => setRules(rules.map((x) => x.id === r.id ? { ...x, priority: Number(e.target.value) } : x))} /></div>
               </div>
+              <div className="field"><label>{t.colDesc}</label><input value={r.description ?? ""} onChange={(e) => setRules(rules.map((x) => x.id === r.id ? { ...x, description: e.target.value || null } : x))} /></div>
               {r.kind !== "ip" && r.kind !== "dictionary" && (
                 <div className="field"><label>{t.pattern}</label><textarea rows={3} value={r.pattern ?? ""} onChange={(e) => setRules(rules.map((x) => x.id === r.id ? { ...x, pattern: e.target.value } : x))} /></div>
               )}
@@ -73,10 +76,12 @@ export default function RulesPage() {
         <div className="field"><label>{t.colType}</label><input value={ntp} onChange={(e) => setNtp(e.target.value)} /></div>
       </div>
       <div className="field"><label>{t.pattern}</label><input value={npat} onChange={(e) => setNpat(e.target.value)} placeholder="(?<!\\d)1[3-9]\\d{9}(?!\\d)" /></div>
+      <div className="field"><label>{t.colDesc}</label><input value={ndesc} onChange={(e) => setNdesc(e.target.value)} /></div>
       <button className="btn" type="button" onClick={() => {
         if (!nid || !ntp || !npat) return;
-        void saveRules([...rules, { id: nid, type_prefix: ntp, enabled: true, priority: 50, kind: "regex", source: "custom", pattern: npat }]);
+        void saveRules([...rules, { id: nid, type_prefix: ntp, enabled: true, priority: 50, kind: "regex", source: "custom", pattern: npat, description: ndesc || null }]);
         setNpat("");
+        setNdesc("");
       }}>{t.addRule}</button>
       <h2>{t.allowlist}</h2>
       <p className="help">{t.helpRules}</p>

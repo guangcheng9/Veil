@@ -7,7 +7,8 @@ pub fn builtin_ruleset() -> RuleSet {
         "EMAIL",
         r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
         80,
-    );
+    )
+    .with_description("邮箱地址。默认关闭，需手动启用。");
     email.enabled = false;
 
     RuleSet::new(
@@ -17,34 +18,48 @@ pub fn builtin_ruleset() -> RuleSet {
                 "PEM",
                 r"-----BEGIN [A-Z0-9 ]+PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]+PRIVATE KEY-----",
                 220,
-            ),
+            )
+            .with_description("私钥文件（PEM 块，含 BEGIN/END 之间的 base64 体）。"),
             Rule::regex(
                 "apikey",
                 "APIKEY",
                 r"(?i)(?:api[_-]?key|access[_-]?key)\s*[:=]\s*\S{8,}|(?<![A-Za-z0-9])(?:sk-ant-|sk-|rk-|pk-live-|pk-test-|xai-|ghp_|gho_|github_pat_|AIza)[A-Za-z0-9_\-]{8,}|AKIA[0-9A-Z]{16}",
                 210,
+            )
+            .with_description(
+                "各类 API 密钥：api_key=/access_key= 赋值，以及 sk-、sk-ant-、rk-、pk-live-、pk-test-、xai-、ghp_、gho_、github_pat_、AIza、AKIA 等带前缀密钥。",
             ),
             Rule::regex(
                 "token",
                 "TOKEN",
                 r"(?i)(?:api[_-]?token|access[_-]?token|auth[_-]?token|refresh[_-]?token)\s*[:=]\s*\S{8,}|(?i)Bearer\s+[A-Za-z0-9\-._~+/]+=*|(?<![A-Za-z0-9])(?:xox[baprs]-|glpat-|npm_[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.)",
                 205,
+            )
+            .with_description(
+                "令牌与 Bearer Token：api_token= 等赋值、Authorization: Bearer、xox-、glpat-、npm_、eyJ 开头的 JWT。",
             ),
             Rule::regex(
                 "connstr",
                 "CONNSTR",
                 r#"(?i)(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|rediss|mssql|sqlserver|mariadb|amqp|amqps|jdbc:\w+)://\S+|(?:Server|Data Source|Initial Catalog)\s*=\s*[^;]+|(?:Pwd|Password|PWD)\s*=\s*[^;\s"]+"#,
                 180,
+            )
+            .with_description(
+                "数据库/中间件连接串：postgres://、mysql://、redis://、jdbc: 等 URI，及 Server=、Pwd= 等 ADO 属性。",
             ),
             Rule::regex(
                 "password",
                 "PASSWORD",
                 r#"(?i)(?:password|passwd|passphrase|login[_-]?password|登录密码|口令)\s*[:=]\s*(?:['"][^'"]{4,}['"]|\S{4,})"#,
                 170,
-            ),
-            Rule::regex("idcard", "IDCARD", r"(?<!\d)\d{17}[\dXx](?!\d)", 150),
-            Rule::regex("phone", "PHONE", r"(?<!\d)1[3-9]\d{9}(?!\d)", 140),
-            Rule::ip("ip", "IP", 120),
+            )
+            .with_description("密码赋值：password=、passwd=、登录密码、口令 等后面的值。"),
+            Rule::regex("idcard", "IDCARD", r"(?<!\d)\d{17}[\dXx](?!\d)", 150)
+                .with_description("中国大陆 18 位身份证号。"),
+            Rule::regex("phone", "PHONE", r"(?<!\d)1[3-9]\d{9}(?!\d)", 140)
+                .with_description("中国大陆 11 位手机号。"),
+            Rule::ip("ip", "IP", 120)
+                .with_description("IPv4/IPv6 地址（解析式识别，非正则）。"),
             email,
         ],
         default_allowlist(),
