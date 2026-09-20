@@ -11,3 +11,5 @@ master.key
 worktrees
 /release-assets
 /flat-rel
+.claude/settings.json
+.claude/settings.local.json
