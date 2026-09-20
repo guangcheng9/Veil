@@ -18,7 +18,9 @@
       "Bash(tasklist)",
       "Bash(taskkill //F //IM esbuild.exe)",
       "Bash(wmic process *)",
-      "Bash(taskkill //F //PID 26160 //PID 30312)"
+      "Bash(taskkill //F //PID 26160 //PID 30312)",
+      "Bash(git ls-remote *)",
+      "Bash(gh auth *)"
     ]
   }
 }
