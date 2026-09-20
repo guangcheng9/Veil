@@ -1,112 +1,110 @@
 #!/usr/bin/env bash
-# Veil 发版脚本：改版本号 → 提交 → 打 tag → 推送（触发 CI 自动发布）
+# Veil 发版脚本（非交互，供 release skill 调用）
 #
-# 用法：
-#   scripts/release.sh 0.3.15           # 改版本、提交、打 tag、推送
-#   scripts/release.sh 0.3.15 --no-push # 只到打 tag，不推送（默认推送）
+# 流程：前置检查 → 改版本号 → 提交 → 打 tag → 推送 master → 推送 tag（触发 CI）
+# 全程打印日志（成功 ✓ / 失败 ✗），任何步骤出错即终止并报错。
 #
-# 推送 v* tag 会触发 .github/workflows/release.yml 的多平台构建 + GitHub Release 上传，
-# 属于不可撤销的公开发布动作，脚本会在推送前再确认一次。
+# 用法：scripts/release.sh <version>
+# 示例：scripts/release.sh 0.3.15
 #
-# RELEASE_NOTES.md 的版本号会被自动替换，但正文（Added/Update 等条目）请手动维护。
+# 前置：
+#   - 必须在 master 分支
+#   - 除 RELEASE_NOTES.md 外，工作区须干净（skill 会先把生成的正文写入 RELEASE_NOTES.md）
+#
+# 该脚本不生成 RELEASE_NOTES.md 的正文内容（Added/Commits 等）——那由 release skill
+# 基于提交记录生成；脚本只负责把版本号（标题 + gh download 行）同步到目标版本。
 
 set -euo pipefail
 
-# --- 参数解析 ---
-PUSH=1
-VERSION=""
-for arg in "$@"; do
-  case "$arg" in
-    --no-push) PUSH=0 ;;
-    -*) echo "未知参数: $arg" >&2; exit 2 ;;
-    *)
-      if [ -z "$VERSION" ]; then
-        VERSION="${arg#v}"   # 允许传 v0.3.15 或 0.3.15
-      else
-        echo "多余参数: $arg" >&2; exit 2
-      fi
-      ;;
-  esac
-done
+log()  { printf '\n==> %s\n' "$*"; }
+ok()   { printf '  ✓ %s\n' "$*"; }
+err()  { printf '  ✗ %s\n' "$*" >&2; }
 
+VERSION="${1:-}"
 if [ -z "$VERSION" ]; then
-  echo "用法: $0 <version> [--no-push]"
-  echo "示例: $0 0.3.15"
+  err "用法: $0 <version>  （例如 $0 0.3.15）"
   exit 2
 fi
-
+VERSION="${VERSION#v}"   # 兼容 v0.3.15 写法
 TAG="v${VERSION}"
-ROOT="$(git rev-parse --show-toplevel)"
-cd "$ROOT"
 
-echo "==> 目标版本: ${VERSION}  (tag: ${TAG})"
+cd "$(git rev-parse --show-toplevel)"
 
-# --- 前置检查 ---
+log "目标版本: ${VERSION}  (tag ${TAG})"
+
+# --- 1. 前置检查 ---
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 if [ "$BRANCH" != "master" ]; then
-  echo "❌ 当前分支不是 master（而是 ${BRANCH}），发版请在 master 上进行。" >&2
+  err "当前分支 ${BRANCH}，发版须在 master 上进行"
   exit 1
 fi
+ok "分支: master"
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "❌ 工作区有未提交的改动，请先 commit 或 stash。" >&2
-  git status --short >&2
+# 除 RELEASE_NOTES.md 外不允许有未提交改动
+if git status --porcelain | grep -vE 'RELEASE_NOTES\.md' | grep -q .; then
+  err "工作区有除 RELEASE_NOTES.md 外的未提交改动，请先 commit 或 stash："
+  git status --short | grep -vE 'RELEASE_NOTES\.md' >&2 || true
   exit 1
 fi
+ok "工作区检查通过（RELEASE_NOTES.md 可未提交）"
 
+# tag 不能已存在
 if git rev-parse "$TAG" >/dev/null 2>&1; then
-  echo "❌ tag ${TAG} 已存在。" >&2
+  err "tag ${TAG} 已存在"
   exit 1
 fi
+ok "tag ${TAG} 不存在，可创建"
 
 LAST_TAG="$(git tag --sort=-v:refname | head -1)"
+log "自 ${LAST_TAG:-仓库起始} 以来的提交："
 if [ -n "$LAST_TAG" ]; then
-  echo "==> 自 ${LAST_TAG} 以来的提交："
-  git log "${LAST_TAG}..HEAD" --oneline | sed 's/^/    /'
+  git log "${LAST_TAG}..HEAD" --oneline | sed 's/^/    /' || true
+else
+  git log --oneline | sed 's/^/    /' || true
 fi
 
-# --- 改版本号 ---
-echo "==> 更新版本号 → ${VERSION}"
-# Cargo.toml（workspace 根 version = "..."）
+# --- 2. 改版本号 ---
+log "更新版本号 → ${VERSION}"
 sed -i -E 's|^version = "[0-9]+\.[0-9]+\.[0-9]+"|version = "'"${VERSION}"'"|' Cargo.toml
-# ui/package.json
 sed -i -E 's|"version": "[0-9]+\.[0-9]+\.[0-9]+"|"version": "'"${VERSION}"'"|' ui/package.json
-# RELEASE_NOTES.md（标题行 + gh release download 行的版本号）
 sed -i -E 's|Veil [0-9]+\.[0-9]+\.[0-9]+|Veil '"${VERSION}"'|g' RELEASE_NOTES.md
 sed -i -E 's|gh release download v[0-9]+\.[0-9]+\.[0-9]+|gh release download v'"${VERSION}"'|g' RELEASE_NOTES.md
+ok "已更新 Cargo.toml / ui/package.json / RELEASE_NOTES.md"
 
-echo "==> 改动预览："
-git --no-pager diff
-
-echo
-echo "⚠️  请确认 RELEASE_NOTES.md 正文内容已更新（Added/Update 等条目需手动维护）。"
-read -r -p "以上版本号改动正确吗？继续将提交 [y/N] " ans
-case "$ans" in
-  y|Y|yes) ;;
-  *) echo "已取消。"; exit 1 ;;
-esac
-
-# --- 提交 + 打 tag ---
+# --- 3. 提交 ---
+log "提交版本变更"
 git add Cargo.toml ui/package.json RELEASE_NOTES.md
-git commit -m "chore: bump version to ${TAG}"
+git commit -m "chore: bump version to ${TAG}" \
+  -m "Co-Authored-By: Claude Code <noreply@anthropic.com>" >/dev/null
+ok "已提交版本变更"
 
+# --- 4. 打 tag ---
+log "打 tag ${TAG}"
 git tag "$TAG"
-echo "==> 已打 tag ${TAG}"
+ok "已打 tag"
 
-# --- 推送 ---
-if [ "$PUSH" -eq 1 ]; then
-  echo
-  echo "⚠️  推送 ${TAG} 将触发 CI 在 5 个平台构建并公开发布到 GitHub Releases，不可撤销。"
-  read -r -p "确认推送 ${TAG} 到 origin 吗？[y/N] " ans
-  case "$ans" in
-    y|Y|yes) ;;
-    *) echo "已取消推送。本地已提交并打 tag，手动推送请运行: git push origin ${TAG}"; exit 0 ;;
-  esac
-  git push origin "$TAG"
-  echo "==> 已推送 ${TAG}，CI 已触发。"
-  echo "    https://github.com/guangcheng9/Veil/actions"
-  echo "    https://github.com/guangcheng9/Veil/releases"
+# --- 5. 推送 master ---
+log "推送 master 分支到 origin"
+if git push origin master; then
+  ok "master 已推送"
 else
-  echo "==> --no-push：本地已完成提交与打 tag，未推送。"
-  echo "    手动推送: git push origin ${TAG}"
+  err "推送 master 失败（tag 已在本地创建，未推送）"
+  err "修复后手动推送: git push origin master && git push origin ${TAG}"
+  exit 1
 fi
+
+# --- 6. 推送 tag（触发 CI） ---
+log "推送 tag ${TAG}（将触发 CI 多平台构建 + GitHub Release）"
+if git push origin "$TAG"; then
+  ok "tag 已推送，CI 已触发"
+else
+  err "推送 tag ${TAG} 失败（master 已推送，tag 未推送）"
+  err "修复后手动推送: git push origin ${TAG}"
+  exit 1
+fi
+
+# --- 完成 ---
+log "发版完成 ✅"
+echo "  Actions:  https://github.com/guangcheng9/Veil/actions"
+echo "  Releases: https://github.com/guangcheng9/Veil/releases"
+echo "  CI 完成后 Releases 页将出现 5 个平台二进制 + SHA256SUMS"
