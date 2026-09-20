@@ -89,6 +89,30 @@ export function setAdminToken(token: string) {
   else sessionStorage.removeItem("veil_admin");
 }
 
+export type UpdateErrorKind = "network" | "rateLimit" | "noRelease" | "unknown";
+
+// 把后端 /api/update 失败时返回的 "502: <detail>" 翻译成稳定的错误种类，
+// 供 Dashboard 展示对应的本地化文案。detail 里带的是 reqwest 的原文错误，
+// 足够区分网络不通 / GitHub 限流 / 解析异常三类。
+export function classifyUpdateError(raw: string): UpdateErrorKind {
+  const m = raw.match(/^\s*(\d+):\s*(.*)$/s);
+  const status = m ? m[1] : "";
+  const detail = (m ? m[2] : raw).toLowerCase();
+  if (status !== "502" && status !== "504" && status !== "503") {
+    return "unknown";
+  }
+  if (/rate limit|secondary rate|too many requests|-> 403|status: 403|forbidden/.test(detail)) {
+    return "rateLimit";
+  }
+  if (/no release tag|release has no|parse|json|invalid|eof/.test(detail)) {
+    return "noRelease";
+  }
+  if (/timed out|timeout|connect|dns|error sending request|connection|pool|reset|broken pipe|gateway/.test(detail)) {
+    return "network";
+  }
+  return "unknown";
+}
+
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (adminToken) headers.set("x-veil-admin-token", adminToken);

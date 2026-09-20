@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, type LifecycleStatus, type TrafficEvent } from "../api";
+import { api, classifyUpdateError, type LifecycleStatus, type TrafficEvent, type UpdateErrorKind } from "../api";
 import { useT } from "../i18n";
 
 type UpdateInfo = { current: string; latest: string; newer: boolean };
@@ -71,6 +71,11 @@ function HBars({ rows }: { rows: [string, number][] }) {
 
 export default function DashboardPage() {
   const { t } = useT();
+  const updErrText = (k: UpdateErrorKind) =>
+    k === "network" ? t.updErrNetwork
+    : k === "rateLimit" ? t.updErrRateLimit
+    : k === "noRelease" ? t.updErrNoRelease
+    : t.updErrUnknown;
   const [events, setEvents] = useState<TrafficEvent[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -185,12 +190,12 @@ export default function DashboardPage() {
             const u = await api.checkUpdate();
             setUpd(u);
             setUpdMsg(u.newer ? t.updateAvail : t.upToDate);
-          } catch (e) { setUpdMsg(String(e)); }
+          } catch (e) { setUpdMsg(updErrText(classifyUpdateError(String(e)))); }
         }}>{t.checkUpdate}</button>
         {upd?.newer && (
           <button type="button" onClick={async () => {
             setUpdMsg(t.updating);
-            try { await api.applyUpdate(); } catch (e) { setUpdMsg(String(e)); }
+            try { await api.applyUpdate(); } catch (e) { setUpdMsg(updErrText(classifyUpdateError(String(e)))); }
           }}>{t.updateNow}</button>
         )}
         {updMsg && <span className="flash">{updMsg}</span>}
