@@ -1,4 +1,4 @@
-Veil 0.3.15
+Veil 0.3.16
 
 ## Added
 
@@ -13,7 +13,7 @@ Console: Check for updates, or `veil update`.
 If GitHub downloads fail:
 
 ```
-gh release download v0.3.15 --repo Mouseww/veil -p veil-windows-x64.exe
+gh release download v0.3.16 --repo Mouseww/veil -p veil-windows-x64.exe
 ```
 
 ## Commits
