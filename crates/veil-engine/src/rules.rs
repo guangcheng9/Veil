@@ -55,21 +55,18 @@ pub struct RuleSet {
 }
 
 impl Rule {
-    pub fn regex(
+    pub fn try_regex(
         id: impl Into<String>,
         type_prefix: impl Into<String>,
         pattern: &str,
         priority: i32,
-    ) -> Self {
+    ) -> Result<Self, fancy_regex::Error> {
         let id = id.into();
         let re = RegexBuilder::new(pattern)
             .backtrack_limit(REGEX_BACKTRACK_LIMIT)
-            .build()
-            .unwrap_or_else(|err| {
-                panic!("invalid regex for rule {id}: {err}");
-            });
+            .build()?;
         let name = id.clone();
-        Self {
+        Ok(Self {
             id,
             name,
             type_prefix: type_prefix.into(),
@@ -79,7 +76,17 @@ impl Rule {
             timeout_ms: DEFAULT_TIMEOUT_MS,
             pattern: Some(pattern.to_string()),
             description: None,
-        }
+        })
+    }
+
+    pub fn regex(
+        id: impl Into<String>,
+        type_prefix: impl Into<String>,
+        pattern: &str,
+        priority: i32,
+    ) -> Self {
+        Self::try_regex(id, type_prefix, pattern, priority)
+            .unwrap_or_else(|err| panic!("invalid regex: {err}"))
     }
 
     pub fn dictionary(

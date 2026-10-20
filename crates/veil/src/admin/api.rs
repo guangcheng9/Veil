@@ -220,10 +220,38 @@ pub async fn put_rules(
         )
             .into_response();
     }
+    let mut candidate = cfg.clone();
+    candidate.rules = body.rules.clone();
+    if let Err(error) = crate::proxy::ruleset_from_config(&candidate) {
+        return (StatusCode::BAD_REQUEST, error).into_response();
+    }
     cfg.rules = body.rules;
     cfg.revision = cfg.revision.saturating_add(1);
     if let Err(e) = cfg.save(&state.data_dir) {
         return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+    }
+    if let Some(lifecycle) = &state.lifecycle {
+        lifecycle.mark_config_changed();
+    }
+    StatusCode::NO_CONTENT.into_response()
+}
+
+pub async fn post_reset_rules(
+    State(state): State<AdminState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    if let Err(code) = require_token(&state, &headers, true) {
+        return code.into_response();
+    }
+    let mut cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
+    cfg.rules.clear();
+    cfg.allowlist = Config::default().allowlist;
+    cfg.revision = cfg.revision.saturating_add(1);
+    if let Err(e) = cfg.save(&state.data_dir) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+    }
+    if let Some(lifecycle) = &state.lifecycle {
+        lifecycle.mark_config_changed();
     }
     StatusCode::NO_CONTENT.into_response()
 }
@@ -280,6 +308,9 @@ pub async fn put_allowlist(
     cfg.revision = cfg.revision.saturating_add(1);
     if let Err(e) = cfg.save(&state.data_dir) {
         return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+    }
+    if let Some(lifecycle) = &state.lifecycle {
+        lifecycle.mark_config_changed();
     }
     StatusCode::NO_CONTENT.into_response()
 }

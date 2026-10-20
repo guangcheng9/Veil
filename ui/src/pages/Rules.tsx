@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type RuleView } from "../api";
 import { useT } from "../i18n";
 
@@ -14,31 +14,96 @@ export default function RulesPage() {
   const [ndesc, setNdesc] = useState("");
   const [rulesRev, setRulesRev] = useState(0);
   const [allowRev, setAllowRev] = useState(0);
+  const fileRef = useRef<HTMLInputElement>(null);
   const load = () => {
     api.rules().then((r) => { setRules(r.rules); setRulesRev(r.revision); }).catch(() => undefined);
     api.allowlist().then((a) => { setAllow(a.allowlist.join("\n")); setAllowRev(a.revision); }).catch(() => undefined);
   };
   useEffect(load, []);
-  const saveRules = async (next: RuleView[]) => {
+  const saveRules = async (next: RuleView[]): Promise<boolean> => {
     try {
       await api.putRules(next, rulesRev);
       setRules(next);
       setRulesRev((r) => r + 1);
       setAllowRev((r) => r + 1);
-      setFlash(t.saved);
+      setFlash(t.rulesSavedRestart);
+      return true;
     } catch (e) {
       const msg = String(e);
-      if (msg.startsWith("409")) { setFlash(t.configChangedHint ?? "Config changed; refresh"); void load(); return; }
+      if (msg.startsWith("409")) { setFlash(t.configChangedHint ?? "Config changed; refresh"); void load(); return false; }
       setFlash(t.failed);
+      return false;
     }
   };
   const patch = (id: string, part: Partial<RuleView>) =>
     saveRules(rules.map((x) => (x.id === id ? { ...x, ...part } : x)));
+  const exportCustom = () => {
+    const custom = rules.filter((rule) => rule.source === "custom");
+    const blob = new Blob([JSON.stringify({ version: 1, rules: custom }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "veil-custom-rules.json";
+    link.click();
+    URL.revokeObjectURL(url);
+    setFlash(t.rulesExported);
+  };
+  const importCustom = async (file: File) => {
+    try {
+      const parsed: unknown = JSON.parse(await file.text());
+      const rows = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === "object" && Array.isArray((parsed as { rules?: unknown }).rules) ? (parsed as { rules: unknown[] }).rules : null);
+      if (!rows) throw new Error("rules must be an array");
+      const imported: RuleView[] = rows.map((row, index) => {
+        if (!row || typeof row !== "object") throw new Error(`rule ${index + 1} is invalid`);
+        const value = row as Partial<RuleView>;
+        if (!value.id || !value.type_prefix) throw new Error(`rule ${index + 1} needs id and type`);
+        const words = Array.isArray(value.words) ? value.words.filter((word): word is string => typeof word === "string" && word.length > 0) : undefined;
+        if (!value.pattern && !words?.length) throw new Error(`rule ${value.id} needs pattern or words`);
+        return {
+          id: String(value.id),
+          type_prefix: String(value.type_prefix),
+          enabled: value.enabled !== false,
+          priority: Number.isFinite(value.priority) ? Number(value.priority) : 50,
+          kind: words?.length ? "dictionary" : "regex",
+          source: "custom",
+          pattern: words?.length ? null : String(value.pattern),
+          words: words?.length ? words : null,
+          description: value.description ? String(value.description) : null,
+        };
+      });
+      const existing = rules.filter((rule) => rule.source !== "custom");
+      if (await saveRules([...existing, ...imported])) setFlash(t.rulesImported);
+    } catch (error) {
+      setFlash(`${t.rulesImportFailed}: ${String(error).replace(/^Error:\s*/, "")}`);
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+  const resetDefaults = async () => {
+    if (!window.confirm(t.rulesResetConfirm)) return;
+    try {
+      await api.resetRules();
+      setOpen(null);
+      load();
+      setFlash(t.rulesResetRestart);
+    } catch {
+      setFlash(t.failed);
+    }
+  };
   return (
     <section>
       <h1>{t.rulesTitle}</h1>
       <p className="help">{t.helpRules}</p>
       {flash && <p className="flash">{flash}</p>}
+      <div className="rule-actions">
+        <button className="btn" type="button" onClick={resetDefaults}>{t.resetRules}</button>
+        <button className="ghost" type="button" onClick={exportCustom}>{t.exportRules}</button>
+        <button className="ghost" type="button" onClick={() => fileRef.current?.click()}>{t.importRules}</button>
+        <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void importCustom(file);
+        }} />
+      </div>
       {rules.map((r) => (
         <div className="rule" key={r.id}>
           <div className="rule-head" onClick={() => setOpen(open === r.id ? null : r.id)} role="button" tabIndex={0}>

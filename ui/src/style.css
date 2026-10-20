@@ -153,6 +153,7 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
 .rule-head .meta { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .rule-head .desc { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%; }
 .rule-body { padding: 0 14px 14px; border-top: 1px solid var(--border); }
+.rule-actions { display: flex; flex-wrap: wrap; gap: 4px; margin: 12px 0 18px; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .iconbtn { background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; cursor: pointer; color: inherit; }
 .chart { width: 100%; height: 140px; color: var(--primary); display: block; }

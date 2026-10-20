@@ -139,6 +139,7 @@ export const api = {
   rules: () => req<{ rules: RuleView[]; revision: number }>("/api/rules"),
   putRules: (rules: RuleView[], revision: number) =>
     req<void>("/api/rules", { method: "PUT", body: JSON.stringify({ rules, revision }) }),
+  resetRules: () => req<void>("/api/rules/reset", { method: "POST" }),
   allowlist: () => req<{ allowlist: string[]; revision: number }>("/api/allowlist"),
   putAllowlist: (list: string[], revision: number) =>
     req<void>("/api/allowlist", { method: "PUT", body: JSON.stringify({ allowlist: list, revision }) }),

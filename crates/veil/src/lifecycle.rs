@@ -243,6 +243,10 @@ async fn start_plane(
         Ok(state) => state.with_traffic(params.traffic.clone()),
         Err(e) => return degraded(params, status_tx, e.to_string()),
     };
+    base.rules = Arc::new(match crate::proxy::ruleset_from_config(&cfg) {
+        Ok(rules) => rules,
+        Err(error) => return degraded(params, status_tx, error),
+    });
     base.alias_hint = cfg.alias_hint;
 
     let mut bound = Vec::new();

@@ -4,7 +4,7 @@ mod forward;
 mod sse;
 
 pub use classify::{classify, ProtocolFamily, UpstreamConfig};
-pub use forward::{proxy_handler, AppState};
+pub use forward::{proxy_handler, ruleset_from_config, AppState};
 pub use sse::{restore_json_body, SseRestorer};
 
 use axum::routing::any;

@@ -11,12 +11,103 @@ use serde_json::Value;
 use veil_engine::builtin::builtin_ruleset;
 use veil_engine::creator::creator_from_headers;
 use veil_engine::mapping::MappingStore;
-use veil_engine::rules::RuleSet;
+use veil_engine::rules::{Allowlist, Rule, RuleSet};
 use veil_engine::walk::{desensitize_json, WalkError};
 
 use super::classify::{classify, upstream_base, ProtocolFamily, UpstreamConfig};
 use crate::admin::{now_unix_ms, TrafficEvent, TrafficLog};
+use crate::config::{Config, RuleSource};
 use crate::logging;
+
+pub fn ruleset_from_config(cfg: &Config) -> Result<RuleSet, String> {
+    let configured = if cfg.rules.is_empty() {
+        builtin_ruleset()
+            .rules()
+            .iter()
+            .map(|rule| crate::config::RuleConfig {
+                id: rule.id.clone(),
+                type_prefix: rule.type_prefix.clone(),
+                enabled: rule.enabled,
+                priority: rule.priority,
+                pattern: rule.pattern.clone(),
+                words: rule.words().map(|words| words.to_vec()),
+                description: rule.description.clone(),
+                source: RuleSource::Builtin,
+            })
+            .collect::<Vec<_>>()
+    } else {
+        cfg.rules.clone()
+    };
+
+    let mut rules = Vec::with_capacity(configured.len());
+    for row in configured {
+        let mut rule = if row.source == RuleSource::Builtin && row.id == "ip" {
+            Rule::ip(row.id.clone(), row.type_prefix.clone(), row.priority)
+        } else if let Some(words) = row.words.filter(|words| !words.is_empty()) {
+            Rule::dictionary(row.id.clone(), row.type_prefix.clone(), words, row.priority)
+        } else {
+            let pattern = row
+                .pattern
+                .as_deref()
+                .ok_or_else(|| format!("rule {} has no regex pattern", row.id))?;
+            Rule::try_regex(
+                row.id.clone(),
+                row.type_prefix.clone(),
+                pattern,
+                row.priority,
+            )
+            .map_err(|error| format!("invalid regex in rule {}: {error}", row.id))?
+        };
+        rule.enabled = row.enabled;
+        if let Some(description) = row.description {
+            rule.description = Some(description);
+        }
+        rules.push(rule);
+    }
+    Ok(RuleSet::new(rules, Allowlist::from(cfg.allowlist.clone())))
+}
+
+#[cfg(test)]
+mod config_rule_tests {
+    use super::ruleset_from_config;
+    use crate::config::{Config, RuleConfig, RuleSource};
+
+    #[test]
+    fn configured_rules_replace_builtins_and_use_custom_allowlist() {
+        let mut cfg = Config::default();
+        cfg.rules = vec![RuleConfig {
+            id: "project".into(),
+            type_prefix: "PROJECT".into(),
+            enabled: true,
+            priority: 100,
+            pattern: Some("RM-[0-9]+".into()),
+            words: None,
+            description: None,
+            source: RuleSource::Custom,
+        }];
+        cfg.allowlist = vec!["RM-123".into()];
+        let rules = ruleset_from_config(&cfg).unwrap();
+        assert!(rules.find_hits("RM-456").is_empty() == false);
+        assert!(rules.find_hits("RM-123").is_empty());
+        assert!(rules.find_hits("13800138000").is_empty());
+    }
+
+    #[test]
+    fn invalid_configured_regex_is_rejected() {
+        let mut cfg = Config::default();
+        cfg.rules = vec![RuleConfig {
+            id: "bad".into(),
+            type_prefix: "BAD".into(),
+            enabled: true,
+            priority: 1,
+            pattern: Some("(".into()),
+            words: None,
+            description: None,
+            source: RuleSource::Custom,
+        }];
+        assert!(ruleset_from_config(&cfg).is_err());
+    }
+}
 
 #[derive(Clone)]
 pub struct AppState {

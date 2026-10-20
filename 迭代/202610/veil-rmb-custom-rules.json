@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "rmb_aliyun_ak",
+      "type_prefix": "ALIYUNAK",
+      "enabled": true,
+      "priority": 215,
+      "kind": "regex",
+      "source": "custom",
+      "pattern": "(?<![A-Za-z0-9_])LTAI[A-Za-z0-9]{12,28}(?![A-Za-z0-9_])",
+      "words": null,
+      "description": "阿里云 LTAI 访问密钥 ID。补充内置 AKIA 规则未覆盖的形态。"
+    },
+    {
+      "id": "rmb_jwt_full",
+      "type_prefix": "TOKEN",
+      "enabled": true,
+      "priority": 216,
+      "kind": "regex",
+      "source": "custom",
+      "pattern": "(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+(?![A-Za-z0-9_-])",
+      "words": null,
+      "description": "完整三段式 JWT，补充内置 JWT 规则可能遗漏签名段的问题。"
+    },
+    {
+      "id": "rmb_coze_token",
+      "type_prefix": "TOKEN",
+      "enabled": true,
+      "priority": 215,
+      "kind": "regex",
+      "source": "custom",
+      "pattern": "(?<![A-Za-z0-9_])sat_[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])",
+      "words": null,
+      "description": "Coze sat_ token。"
+    },
+    {
+      "id": "rmb_appcode",
+      "type_prefix": "TOKEN",
+      "enabled": true,
+      "priority": 215,
+      "kind": "regex",
+      "source": "custom",
+      "pattern": "(?i)\\bAPPCODE[ \\t]+[A-Za-z0-9_-]{8,}",
+      "words": null,
+      "description": "日志或配置文本中的 APPCODE 鉴权信息。"
+    },
+    {
+      "id": "rmb_url_secret",
+      "type_prefix": "URLSECRET",
+      "enabled": true,
+      "priority": 235,
+      "kind": "regex",
+      "source": "custom",
+      "pattern": "(?i)(?<=[?&])(?:access[_-]?token|refresh[_-]?token|secret|app[_-]?secret|js_code|signature)=[^&\\s\"'<>#]+",
+      "words": null,
+      "description": "文本中 URL 查询参数携带的 token、secret、js_code 或 signature。仅处理发送给模型的文本，不改写代理实际请求 URL。"
+    }
+  ]
+}

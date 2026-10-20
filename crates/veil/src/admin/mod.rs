@@ -24,6 +24,7 @@ pub fn router(state: AdminState) -> Router {
         .route("/api/lifecycle/restart", post(api::post_lifecycle_restart))
         .route("/api/lifecycle/exit", post(api::post_lifecycle_exit))
         .route("/api/rules", get(api::get_rules).put(api::put_rules))
+        .route("/api/rules/reset", post(api::post_reset_rules))
         .route(
             "/api/allowlist",
             get(api::get_allowlist).put(api::put_allowlist),
