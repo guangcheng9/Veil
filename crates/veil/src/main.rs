@@ -99,8 +99,11 @@ fn open_browser(url: &str) {
     };
 }
 
-fn print_ready(cfg: &Config) {
-    let ui = ui_url(cfg);
+/// 打印服务就绪信息。
+/// 控制台地址必须带上 `?token=`，否则用户在新标签页/重开浏览器后进入
+/// 控制台，保存上游、重启转发等写操作会因缺少管理令牌返回 401。
+fn print_ready(cfg: &Config, data_dir: &std::path::Path) {
+    let ui = ui_url_with_token(cfg, data_dir);
     println!("Veil is running");
     println!("  console: {ui}");
     println!("  proxy:   {DEFAULT_PROXY_URL}  (default)");
@@ -123,7 +126,7 @@ async fn cmd_start(foreground: bool) -> Result<(), Box<dyn std::error::Error>> {
                 Ok(lock) => break lock,
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                     if probe_lifecycle(cfg.management_port).await.is_some() {
-                        print_ready(&cfg);
+                        print_ready(&cfg, &data_dir);
                         open_browser(&ui_url_with_token(&cfg, &data_dir));
                         return Ok(());
                     }
@@ -133,7 +136,7 @@ async fn cmd_start(foreground: bool) -> Result<(), Box<dyn std::error::Error>> {
             }
         };
         if probe_lifecycle(cfg.management_port).await.is_some() {
-            print_ready(&cfg);
+            print_ready(&cfg, &data_dir);
             open_browser(&ui_url_with_token(&cfg, &data_dir));
             return Ok(());
         }
@@ -155,7 +158,7 @@ async fn cmd_start(foreground: bool) -> Result<(), Box<dyn std::error::Error>> {
                 });
             return Err(detail.into());
         }
-        print_ready(&cfg);
+        print_ready(&cfg, &data_dir);
         open_browser(&ui_url_with_token(&cfg, &data_dir));
         return Ok(());
     }
@@ -187,7 +190,7 @@ async fn cmd_start(foreground: bool) -> Result<(), Box<dyn std::error::Error>> {
         }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             if probe_lifecycle(cfg.management_port).await.is_some() {
-                print_ready(&cfg);
+                print_ready(&cfg, &data_dir);
                 Ok(())
             } else {
                 Err("another Veil instance owns this data directory but its control plane is not responding".into())
@@ -259,7 +262,7 @@ async fn serve(
     if let Err(error) = lifecycle.start().await {
         eprintln!("data plane did not start: {error}");
     }
-    print_ready(&cfg);
+    print_ready(&cfg, &data_dir);
     let result = axum::serve(listener, mgmt)
         .with_graceful_shutdown(async move {
             while !*exit_rx.borrow() {
@@ -384,8 +387,10 @@ async fn probe_lifecycle(port: u16) -> Option<CliLifecycle> {
 }
 
 fn cmd_ui(open: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let cfg = Config::load(&default_data_dir())?;
-    let url = ui_url(&cfg);
+    let data_dir = default_data_dir();
+    let cfg = Config::load(&data_dir)?;
+    // 控制台地址必须带上管理令牌，否则页面内的写操作（保存上游 / 重启转发）会 401。
+    let url = ui_url_with_token(&cfg, &data_dir);
     println!("{url}");
     if open {
         open_browser(&url);

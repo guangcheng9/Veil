@@ -23,7 +23,10 @@ export default function App() {
   const { t } = useT();
   const { dark, toggle } = useTheme();
   const [tab, setTab] = useState<Tab>("status");
-  const [token, setToken] = useState(() => sessionStorage.getItem("veil_admin") ?? "");
+  // 与 api.ts 保持一致：令牌存 localStorage，避免新标签页打开后写操作 401。
+  const [token, setToken] = useState(
+    () => localStorage.getItem("veil_admin") ?? sessionStorage.getItem("veil_admin") ?? "",
+  );
   const [status, setStatus] = useState<StatusBody | null>(null);
   const [online, setOnline] = useState(true);
   const [ver, setVer] = useState("");

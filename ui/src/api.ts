@@ -82,12 +82,27 @@ export type LifecycleStatus = {
   pending_config_change: boolean;
 };
 
-let adminToken = sessionStorage.getItem("veil_admin") ?? "";
+// 令牌持久化到 localStorage：sessionStorage 会在新标签页 / 重开浏览器后清空，
+// 导致用户每次都要重新用 ?token= 打开控制台才能保存配置（否则写操作 401）。
+// 令牌本身已明文存放在本机 admin.token，localStorage 同源可见，不额外扩大暴露面。
+const TOKEN_KEY = "veil_admin";
+const legacyToken = sessionStorage.getItem(TOKEN_KEY);
+const storedToken = localStorage.getItem(TOKEN_KEY) ?? legacyToken ?? "";
+if (legacyToken) {
+  // 从旧版 sessionStorage 迁移一次，避免老用户已经打开的页面立刻失效。
+  localStorage.setItem(TOKEN_KEY, legacyToken);
+  sessionStorage.removeItem(TOKEN_KEY);
+}
+let adminToken = storedToken;
 
+/**
+ * 保存管理令牌。
+ * 传入空串等价于清除令牌。
+ */
 export function setAdminToken(token: string) {
   adminToken = token;
-  if (token) sessionStorage.setItem("veil_admin", token);
-  else sessionStorage.removeItem("veil_admin");
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
 }
 
 export type UpdateErrorKind = "network" | "rateLimit" | "noRelease" | "unknown";
