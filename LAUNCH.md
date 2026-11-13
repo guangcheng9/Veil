@@ -191,14 +191,17 @@ cargo run -p veil -- start --foreground   # 控制面可用，但访问 UI 返�
 
 #### 5.1.1 发版脚本（推荐）
 
-[scripts/release.sh](scripts/release.sh) 把「改版本号 → 提交 → 打 tag → 推送」串成一步，推送后 CI 自动完成多平台构建与 Release 上传。
+正式发版以 [.claude/skills/release/SKILL.md](.claude/skills/release/SKILL.md) 中的流程为准。[scripts/release.sh](scripts/release.sh) 把「迭代记录检查 → 改版本号 → 提交 → 打 tag → 推送」串成一步，推送后 CI 自动完成多平台构建与 Release 上传。
 
 ```bash
-scripts/release.sh 0.3.15           # 改版本、提交、打 tag、推送（触发 CI）
-scripts/release.sh 0.3.15 --no-push # 只到打 tag，不推送
+scripts/release.sh 0.3.19
 ```
 
-脚本自动改三处版本号（[Cargo.toml](Cargo.toml) workspace 根版本、[ui/package.json](ui/package.json)、[RELEASE_NOTES.md](RELEASE_NOTES.md) 的标题与 `gh release download` 行），并在推送前二次确认——因为推送 `v*` tag 会触发 CI 公开发布，不可撤销。[RELEASE_NOTES.md](RELEASE_NOTES.md) 的正文（Added/Update 等条目）需手动维护。
+发版前必须同步并提交 [迭代记录](迭代/Veil本地迭代记录.md)。脚本会检查该文件自上一个 tag 以来有更新，并包含目标版本、版本概览、详细迭代章节和发布提交回填占位；任一检查失败都会终止发版。
+
+脚本自动改四处版本号（[Cargo.toml](Cargo.toml) workspace 根版本、[ui/package.json](ui/package.json)、[plugin/claude-code/plugin.json](plugin/claude-code/plugin.json)、[RELEASE_NOTES.md](RELEASE_NOTES.md) 的标题与 `gh release download` 行）。[RELEASE_NOTES.md](RELEASE_NOTES.md) 的正文（Added/Update、Commits 等条目）由 release skill 生成。
+
+脚本只允许 `RELEASE_NOTES.md` 保持未提交；迭代记录必须先单独提交。推送 `v*` tag 会触发 CI 公开发布，不可撤销。发版成功后，使用脚本输出的 release commit 回填迭代记录，再提交并推送 `master`。
 
 #### 5.1.2 手动发版
 
@@ -323,7 +326,7 @@ veil update --check               # 检查 GitHub 最新 release
 | 本地 release 包 | `npm run build`(ui) → `cargo build --release -p veil` |
 | 本地产物分发 | 单文件 `veil(.exe)` 直接发，单平台自包含（见 [3.1](#31-产物分发单文件即可用)） |
 | Windows EPERM unlink | 查 `tasklist \| grep esbuild` → `taskkill //F //IM esbuild.exe`（见 [3.3](#33-windows-文件锁eperm-unlink排查)） |
-| 正式多平台发布 | `scripts/release.sh <ver>` 一键改版本+打 tag+推送触发 CI（见 [5.1.1](#511-发版脚本推荐)） |
+| 正式多平台发布 | release skill：同步并提交迭代记录 → `scripts/release.sh <ver>` 改版本+打 tag+推送触发 CI，发版后回填 release commit（见 [5.1.1](#511-发版脚本推荐)） |
 | CI 产物各平台使用 | 按 [5.3 表](#53-ci-release-产物各平台怎么用) 选对应平台单文件下载即用 |
 | 启动服务 | `veil` / `veil start --foreground` |
 | 停止 / 状态 | `veil stop` / `veil status` |
