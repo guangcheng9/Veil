@@ -146,7 +146,7 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const api = {
   status: () => req<StatusBody>("/api/status"),
-  lifecycle: () => req<LifecycleStatus>("/api/lifecycle"),
+  lifecycle: (signal?: AbortSignal) => req<LifecycleStatus>("/api/lifecycle", { signal }),
   startProxy: () => req<LifecycleStatus>("/api/lifecycle/start", { method: "POST" }),
   stopProxy: () => req<LifecycleStatus>("/api/lifecycle/stop", { method: "POST" }),
   restartProxy: () => req<LifecycleStatus>("/api/lifecycle/restart", { method: "POST" }),
@@ -170,10 +170,14 @@ export const api = {
   resetToken: () => req<{ token: string }>("/api/admin-token/reset", { method: "POST" }),
   checkUpdate: () => req<{ current: string; latest: string; newer: boolean; asset: string; url: string }>("/api/update"),
   applyUpdate: () => req<{ restarting?: boolean; latest?: string; current?: string; newer?: boolean }>("/api/update", { method: "POST" }),
-  traffic: async () => {
-    const text = await req<string>("/api/traffic");
+  traffic: async (signal?: AbortSignal) => {
+    const text = await req<string>("/api/traffic", { signal });
     const line = String(text).split("\n").find((l) => l.startsWith("data: "));
-    if (!line) return [] as TrafficEvent[];
-    try { return JSON.parse(line.slice(6)) as TrafficEvent[]; } catch { return []; }
+    if (!line) throw new Error("invalid /api/traffic response: missing data line");
+    try {
+      return JSON.parse(line.slice(6)) as TrafficEvent[];
+    } catch {
+      throw new Error("invalid /api/traffic response: malformed JSON");
+    }
   },
 };

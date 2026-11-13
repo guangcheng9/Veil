@@ -198,3 +198,43 @@ aside input.token { font-size: 12px; }
   .service-control { grid-template-columns: 1fr; }
   .service-actions { justify-content: flex-start; }
 }
+
+/* Dashboard metric scope */
+.data-scope {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px 16px;
+  flex-wrap: wrap; margin: 0 0 16px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--muted-bg);
+  color: var(--muted); font-size: 12px;
+}
+.data-scope-main { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.data-scope-main strong { color: var(--foreground); }
+.scope-badge {
+  display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 9px;
+  background: var(--card); border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+}
+.scope-badge.full { color: #92400e; background: #fffbeb; border-color: #fcd34d; }
+[data-theme="dark"] .scope-badge.full { color: #fde68a; background: #422006; border-color: #92400e; }
+.inline-error {
+  margin: 0 0 16px; padding: 9px 12px; border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, var(--card));
+}
+.metric-section { margin: 0 0 28px; }
+.metric-section h2 { margin-bottom: 4px; }
+.section-help { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 12px; max-width: 76ch; }
+.metric-cards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin: 12px 0; }
+.metric-card { display: flex; flex-direction: column; min-height: 154px; }
+.metric-card .value { display: flex; align-items: baseline; flex-wrap: wrap; }
+.metric-scope { margin-top: 8px; color: var(--foreground); font-size: 12px; font-weight: 600; }
+.metric-hint { margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.metric-note { margin: 8px 0 2px; color: #b45309; font-size: 12px; }
+[data-theme="dark"] .metric-note { color: #fbbf24; }
+.metric-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.type-card { margin-top: 12px; }
+.chart-card { padding-bottom: 10px; }
+.chart-card .chart { margin-top: 12px; }
+@media (max-width: 840px) {
+  .data-scope { align-items: flex-start; flex-direction: column; }
+  .metric-card { min-height: 0; }
+}
+.loading-line { margin: 0 0 16px; font-size: 12px; }
