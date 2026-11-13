@@ -7,7 +7,7 @@ description: 启动本地 Veil 脱敏网关，让 Claude Code 流量先脱敏再
 
 用户如果还没装网关：提示去 GitHub Releases 下载 `veil-windows-x64.exe` 并双击，或运行 PowerShell：
 
-`irm https://raw.githubusercontent.com/Mouseww/veil/main/scripts/install.ps1 | iex`
+`irm https://raw.githubusercontent.com/guangcheng9/Veil/master/scripts/install.ps1 | iex`
 
 然后：
 

@@ -6,7 +6,7 @@
 
 Veil 挂在这台电脑的门口。机密先换成化名再出门；模型的回答进门，化名再变回真名。你看到的还是原文。窗外那台模型，从头到尾只看见化名。
 
-[下载](https://github.com/Mouseww/veil/releases/latest) · [English](README.md) · Apache-2.0 · 无遥测
+[下载](https://github.com/guangcheng9/Veil/releases/latest) · [English](README.md) · Apache-2.0 · 无遥测
 
 ---
 
@@ -35,7 +35,7 @@ Veil 挂在这台电脑的门口。机密先换成化名再出门；模型的回
 ## 一行装上，就能用
 
 ```powershell
-irm https://raw.githubusercontent.com/Mouseww/veil/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/guangcheng9/Veil/master/scripts/install.ps1 | iex
 ```
 
 浏览器弹出 http://127.0.0.1:18788 就是装好了。再在新终端跑一句：
@@ -48,7 +48,7 @@ veil setup
 
 也可以在管理页 **上游** 里点「接入 Veil」，不必先跑命令行。
 
-也可以去 [Releases](https://github.com/Mouseww/veil/releases/latest) 下载 `veil-windows-x64.exe` 双击，效果一样。
+也可以去 [Releases](https://github.com/guangcheng9/Veil/releases/latest) 下载 `veil-windows-x64.exe` 双击，效果一样。
 
 ---
 

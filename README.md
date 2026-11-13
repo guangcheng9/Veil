@@ -6,7 +6,7 @@ You drop `.env` into the chat so it can fix a bug. It does — and the password 
 
 Veil hangs in the doorway of this machine. Secrets go out under an alias. When the answer walks back in, the alias is swapped for the original. You still read plaintext. Outside, the model only ever saw aliases.
 
-[Download](https://github.com/Mouseww/veil/releases/latest) · [中文说明](README.zh-CN.md) · Apache-2.0 · no telemetry
+[Download](https://github.com/guangcheng9/Veil/releases/latest) · [中文说明](README.zh-CN.md) · Apache-2.0 · no telemetry
 
 ---
 
@@ -35,7 +35,7 @@ The same secret keeps the same alias for the whole conversation. It will not spl
 ## One line, then you are in
 
 ```powershell
-irm https://raw.githubusercontent.com/Mouseww/veil/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/guangcheng9/Veil/master/scripts/install.ps1 | iex
 ```
 
 When the browser opens http://127.0.0.1:18788 , it is installed. In a new terminal:
@@ -48,7 +48,7 @@ Pick the apps you use. Veil reads each app's **current** API address (official o
 
 You can also click **Point this app at Veil** on the console **Upstream** tabs. Same result.
 
-Or grab `veil-windows-x64.exe` from [Releases](https://github.com/Mouseww/veil/releases/latest) and double-click.
+Or grab `veil-windows-x64.exe` from [Releases](https://github.com/guangcheng9/Veil/releases/latest) and double-click.
 
 ---
 

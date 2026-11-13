@@ -67,13 +67,14 @@ fi
 log "更新版本号 → ${VERSION}"
 sed -i -E 's|^version = "[0-9]+\.[0-9]+\.[0-9]+"|version = "'"${VERSION}"'"|' Cargo.toml
 sed -i -E 's|"version": "[0-9]+\.[0-9]+\.[0-9]+"|"version": "'"${VERSION}"'"|' ui/package.json
+sed -i -E 's|"version": "[0-9]+\.[0-9]+\.[0-9]+"|"version": "'"${VERSION}"'"|g' plugin/claude-code/plugin.json
 sed -i -E 's|Veil [0-9]+\.[0-9]+\.[0-9]+|Veil '"${VERSION}"'|g' RELEASE_NOTES.md
 sed -i -E 's|gh release download v[0-9]+\.[0-9]+\.[0-9]+|gh release download v'"${VERSION}"'|g' RELEASE_NOTES.md
-ok "已更新 Cargo.toml / ui/package.json / RELEASE_NOTES.md"
+ok "已更新 Cargo.toml / ui/package.json / plugin.json / RELEASE_NOTES.md"
 
 # --- 3. 提交 ---
 log "提交版本变更"
-git add Cargo.toml ui/package.json RELEASE_NOTES.md
+git add Cargo.toml ui/package.json plugin/claude-code/plugin.json RELEASE_NOTES.md
 git commit -m "chore: bump version to ${TAG}" \
   -m "Co-Authored-By: Claude Code <noreply@anthropic.com>" >/dev/null
 ok "已提交版本变更"

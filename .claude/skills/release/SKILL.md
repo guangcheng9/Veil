@@ -46,7 +46,7 @@ Console: Check for updates, or `veil update`.
 If GitHub downloads fail:
 
 ```
-gh release download v<新版本号> --repo Mouseww/veil -p veil-windows-x64.exe
+gh release download v<新版本号> --repo guangcheng9/Veil -p veil-windows-x64.exe
 ```
 ```
 
@@ -70,7 +70,7 @@ scripts/release.sh <新版本号>
 
 脚本会：
 - 前置检查（master 分支、除 RELEASE_NOTES.md 外工作区干净、tag 不存在）
-- 自动改 [Cargo.toml](../../../Cargo.toml)、[ui/package.json](../../../ui/package.json)、RELEASE_NOTES.md 的版本号
+- 自动改 [Cargo.toml](../../../Cargo.toml)、[ui/package.json](../../../ui/package.json)、[plugin.json](../../../plugin/claude-code/plugin.json)、RELEASE_NOTES.md 的版本号
 - 提交 `chore: bump version to vX.Y.Z`
 - 打 tag
 - 推送 master → 推送 tag（触发 CI）

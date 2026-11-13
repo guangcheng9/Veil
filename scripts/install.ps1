@@ -1,6 +1,6 @@
 # Veil install / update for Windows (download to .new, then swap the PATH binary)
 $ErrorActionPreference = "Stop"
-$repo = "Mouseww/veil"
+$repo = "guangcheng9/Veil"
 $dir = Join-Path $env:LOCALAPPDATA "veil"
 $bin = Join-Path $dir "bin"
 New-Item -ItemType Directory -Force -Path $bin | Out-Null
