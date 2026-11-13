@@ -24,7 +24,7 @@ The real model API the gateway forwards to after desensitization. v1 upstream pr
 
 ## Upstream Target（上游地址）
 
-The Base URL the gateway forwards a protocol family to. It is chosen from gateway configuration, not from extra client headers or rewritten client paths. Each protocol family has one configurable target, defaulting to the vendor's official API. Unmatched protocol families are rejected rather than blindly proxied.
+The Base URL the gateway forwards a protocol family to. The general port uses one configurable target per protocol family. Per-client routes may override the target for their protocol family. Unmatched paths on the general port are rejected rather than blindly proxied.
 
 ## Protocol Prefix Passthrough（同协议前缀透传）
 
@@ -36,7 +36,7 @@ Anthropic `POST /v1/messages/count_tokens` sends a full Messages-shaped prompt i
 
 ## Downstream / Client（下游 / 客户端）
 
-The caller that points its Base URL at the gateway. v1 first-party client is Claude Code, via a Skill/Plugin. Other clients may still connect by changing Base URL only.
+The caller that points its Base URL at the gateway. Current setup supports Claude Code, Codex, PI Agent, CodeBuddy, Grok Builder, Hermes, and Trae. Other clients can connect by changing their Base URL when they use a supported protocol.
 
 ## 上行脱敏（Outbound Desensitization）
 
@@ -90,7 +90,7 @@ The mapping table is written to local encrypted storage so restoration still wor
 
 ## Master Key（主密钥）
 
-The operator-managed wrapping key for Encrypted Persistence. Environment variable `DGW_MASTER_KEY` wins when set. Otherwise the gateway reads a local key file. In Desktop Mode, first launch generates a random key into that file. In Server Mode, missing both the environment variable and the key file is a hard start failure for the Proxy Port. The Management UI can rotate the key (re-encrypt the Mapping Table) but never displays the current value.
+The operator-managed wrapping key for Encrypted Persistence. `VEIL_MASTER_KEY` (then `DGW_MASTER_KEY`) wins when set. Otherwise the gateway reads a local key file. In Desktop Mode, first launch generates a random key into that file. In Server Mode, missing both the environment variable and the key file is a hard start failure for the Proxy Port. The Management UI can replace `master.key`, but the current implementation does not re-encrypt existing rows and the running mapping store does not hot-reload the key. Restart Veil to reopen the store with the new key.
 
 ## Rule（规则）
 
@@ -98,19 +98,19 @@ A user-manageable matcher that detects one class of sensitive value. Rules are g
 
 ## Built-in Rule Pack（内置规则包）
 
-The default rules shipped with the gateway. They can be disabled but not deleted. They cover secrets/tokens, connection strings, China mobile numbers, national ID numbers, and IP addresses. The IP rule parses candidates as IPv4 or IPv6 and replaces every successful parse, including public addresses. Type prefix is `IP`. Email is shipped disabled because of false positives. Allowlist still excludes `127.0.0.1`, `localhost`, `0.0.0.0`, and `::1`.
+The default rules shipped with the gateway. They can be disabled but not deleted. They cover secrets/tokens, connection strings, China mobile numbers, national ID numbers, and IP addresses. The IP rule parses candidates as IPv4 or IPv6 and replaces every successful parse, including public addresses. Type prefix is `IP`. Email is shipped disabled because of false positives. Allowlist contains `127.0.0.1`, `localhost`, `0.0.0.0`, and `::1`, so those values are not replaced.
 
 ## Allowlist（白名单）
 
-Exact strings that must never be replaced. Defaults include `127.0.0.1`, `localhost`, and `0.0.0.0`.
+Exact strings that must never be replaced. Defaults include `127.0.0.1`, `localhost`, `0.0.0.0`, and `::1`.
 
-## Rule Dry Run（规则试跑）
+## Rule Dry Run（规则试跑，未实现）
 
-A Management UI action that runs the current rule set against a sample text locally and shows hits. The sample is not sent upstream.
+Not implemented in the current Management UI. The reserved behavior would run the current rule set against sample text locally without sending it upstream.
 
 ## Proxy Port（代理端口）
 
-The model-facing listen port. Downstream clients point their API Base URL here. It must not expose configuration or mapping plaintext. Inbound defaults to HTTP. Desktop Mode binds localhost. Server Mode may enable optional TLS with an operator-supplied certificate when binding beyond localhost. Outbound TLS follows the Upstream Target URL. v1 does not install a custom CA or intercept HTTPS to vendor hostnames. For requests whose body must be scanned or whose response must be restored, the gateway forces upstream `Accept-Encoding: identity` (or omits the header) so the stream is plaintext. This is the only request-header mutation. The client receives uncompressed payloads.
+The model-facing listen port. Downstream clients point their API Base URL here. It must not expose configuration or mapping plaintext. Inbound defaults to HTTP. Desktop Mode binds localhost. Server Mode may enable optional TLS with an operator-supplied certificate when binding beyond localhost. Outbound TLS follows the Upstream Target URL. The gateway does not install a custom CA or intercept HTTPS to vendor hostnames. For requests whose body must be scanned or whose response must be restored, the gateway forces upstream `Accept-Encoding: identity` and also normalizes required transport headers such as `Host`, `Content-Length`, `Transfer-Encoding`, and connection headers.
 
 ## Management Port（管理端口）
 
@@ -124,7 +124,7 @@ The management API accepts `x-veil-admin-token`, `x-dgw-admin-token`, `Authoriza
 
 ## Management UI（管理界面）
 
-The Web UI used to inspect gateway status, edit rules, set the Master Key, and set Upstream Targets. v1 screens: Status, Rules (including dry run), Upstream & Access, Keys & Danger Zone, and Live Traffic. Live Traffic shows method, path template, status, streaming flag, hit rule types, and latency — never bodies, query strings, credentials, or plaintext. The UI never displays mapping plaintext or the current Master Key value.
+The Web UI used to inspect gateway status, edit rules, configure upstreams, manage keys, and inspect traffic. Current screens are Dashboard, Rules, Upstream, Keys, and Traffic. Rules supports built-in/custom rules, allowlist, import/export, and reset; the current UI has no dry run. Live Traffic shows method, path, status, streaming flag, hit rule types, upstream TTFB, error class, and Creator prefix - never bodies, query strings, credentials, or plaintext. The UI never displays mapping plaintext or the current Master Key value.
 
 ## Official Subscription（官方订阅）
 
@@ -148,11 +148,11 @@ The local directory that holds the Mapping Store, Master Key file, pid/listen re
 
 ## Default Ports（默认端口）
 
-Proxy Port 18787 and Management Port 18788 unless configured otherwise. A single process listens on both.
+Proxy Port 18787 and Management Port 18788 unless configured otherwise. Per-client routes use ports starting at 18791. A single process listens on all configured ports.
 
 ## Config File（配置文件）
 
-The single configuration source is `config.toml` in the Data Directory. The Management UI reads and writes this file. Rules, allowlists, Upstream Targets, bind addresses, TLS paths, TTL, and size limits live here. The Master Key does not. A small set of environment variables overrides specific operational fields (`DGW_DATA_DIR`, `DGW_MASTER_KEY`, `DGW_BIND`, `DGW_NO_DOWNLOAD`) and wins over the file. Rule and upstream edits apply without restart; bind-address and port changes require restart.
+The single configuration source is `config.toml` in the Data Directory. The Management UI reads and writes this file. Rules, allowlists, Upstream Targets, per-client routes, bind addresses, TLS paths, TTL, and size limits live here. The Master Key does not. `VEIL_*` environment variables override supported operational fields, with legacy `DGW_*` names still accepted. Rules, allowlist, upstream, and request-body-limit changes take effect after restarting forwarding. The graceful-shutdown timeout is read when stopping. Bind-address and listener-port changes require restarting the process. The mapping TTL field is not yet connected to the SQLite store.
 
 ## Desktop Mode（桌面级）
 
@@ -168,4 +168,4 @@ The persistence behind the Mapping Table. v1 uses a local SQLite file with appli
 
 ## Mapping Retention（映射留存）
 
-A mapping expires after 90 days of inactivity by default (no write or restore). Each Creator also has a hard cap (100,000 rows); overflow is evicted LRU. The Management UI can change TTL and wipe a Creator prefix. It cannot display plaintext.
+The SQLite store defines default TTL and per-Creator cap constants, but the current code does not apply configured TTL, automatic expiry, or LRU eviction. The Management UI exposes a TTL field and a purge entry point, but the configured TTL is not wired into the store and the purge endpoint does not yet delete rows. Do not treat mapping retention controls as complete.
