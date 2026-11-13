@@ -3,9 +3,12 @@
 > 文档类型：本地迭代记录（不是功能设计稿）  
 > 文档更新日期：2026-11-13  
 > 本地项目：`D:\workspace\tools\veil`  
-> 当前分支：`master`  
-> 当前版本：`v0.3.17`  
-> 当前提交：`bdef91a`  
+> 当前分支：`port-upstream-v0.4.1-safety`<br>
+> 当前版本：`v0.3.17`（代码基线 `bdef91a`）<br>
+> P0/P1 实现提交：`b1a89da`<br>
+> 迭代起点：`39cf272`（本地迭代记录文档提交）<br>
+> 当前迭代计划：[上游 v0.4.1 对比与安全移植计划](202611/20261113_上游v0.4.1对比与安全移植计划.md)<br>
+> 计划状态：P0/P1 已实现并提交；P2/P3/P4 按决策保留<br>
 > 上游项目：`https://github.com/Mouseww/veil`  
 > 上游对比版本：`v0.4.1`（`82f9290`）
 
@@ -33,6 +36,18 @@
 | 上游仓库 | `https://github.com/Mouseww/veil` | 原始 Veil 项目 |
 | 上游本地副本 | `D:\workspace\tools\veil\yuan-veil` | 只用于对比，不修改、不提交 |
 | 迭代资料目录 | `D:\workspace\tools\veil\迭代` | 存放设计、规则、迁移和迭代记录 |
+
+#### 迭代资料索引
+
+| 日期 | 文档 | 状态 | 说明 |
+| --- | --- | --- | --- |
+| 2026-09-18 | [代理与生命周期设计](202609/DESIGN_proxy_and_lifecycle.md) | 已归档 | 控制面/数据面生命周期设计 |
+| 2026-09-20 | [项目重命名记录](202609/RENAME_veil_to_cowl.md) | 已归档 | 命名和目录演进记录 |
+| 2026-10-10 | [RMB 3.0 脱敏分级清单](202610/rmb_3.0_脱敏内容与重要程度分级清单.md) | 已归档 | 敏感数据分级与脱敏要求 |
+| 2026-10-10 | [RMB 3.0 项目专属配置方案](202610/rmb_3.0_Veil项目专属脱敏配置方案.md) | 已归档 | 项目专属规则配置方案 |
+| 2026-10-20 | [测试规则](202610/测试规则.md) | 已归档 | 规则样例与验证材料 |
+| 2026-10-20 | [规则管理与转发生效说明](202610/规则管理功能与转发生效说明.md) | 已归档 | 规则管理行为说明 |
+| 2026-11-13 | [上游 v0.4.1 对比与安全移植计划](202611/20261113_上游v0.4.1对比与安全移植计划.md) | 评估完成，待实施 | P0-P4 取舍、实施顺序、测试和回滚边界 |
 
 ### 3. 当前版本概览
 
@@ -458,9 +473,9 @@ tag：`v0.3.17`。
 | 发布脚本和 release skill | `scripts/release.sh`、`.claude/skills/release` | 降低发布失误 | 与运行时代码无关 |
 | RMB 3.0 脱敏资料 | `迭代/202610` | 项目化配置和验证资料 | 本地项目资料 |
 
-#### 6.2 上游 v0.4.0/v0.4.1 有、本地尚未合入
+#### 6.2 上游 v0.4.0/v0.4.1 能力与本地状态
 
-| 上游能力 | 上游位置 | 本地状态 | 初步评价 |
+| 上游能力 | 上游位置 | 本地状态 | 结论 |
 | --- | --- | --- | --- |
 | `ruleset.rs` 规则集模块 | `crates/veil/src/ruleset.rs` | 本地没有该文件，规则构建在 proxy 层 | 可评估模块化收益，但不能覆盖本地配置构建逻辑 |
 | region pack | engine 内置规则与配置 | 本地没有完整 region pack | 只有明确需要“地域规则包”时才值得引入 |
@@ -468,9 +483,9 @@ tag：`v0.3.17`。
 | egress proxy / SOCKS5 | `config.rs`、`proxy/forward.rs` | 本地有 `upstream_proxy`，仅校验 http/https | 可借鉴 SOCKS5 支持，但需统一配置字段和直连语义 |
 | anti-ban 重设计文档 | `docs/redesign-anti-ban.md` | 本地没有 | 文档可以对比，功能不应未经需求确认直接合入 |
 | 登录页 | `ui/src/pages/Login.tsx` | 本地没有同名登录页 | 与本地令牌持久化方案存在重叠，需先决定认证模型 |
-| Bearer/cookie 鉴权 | `admin/auth.rs`、UI | 本地以 `x-veil-admin-token` 和 localStorage 为主 | 需要安全审计和兼容设计 |
-| base64/data URL 完整性保护 | `crates/veil-engine/src/binary.rs`、`walk.rs` | 本地尚未包含 | 高优先级评估项，可能影响多模态和图片请求 |
-| base64 图片相关测试 | engine、proxy tests | 本地未包含同等测试 | 合入前必须补回测试并跑回归 |
+| Bearer/cookie 鉴权 | `admin/auth.rs`、UI | 已支持 `x-dgw-admin-token` 和 Bearer；登录页/Cookie 写入未引入 | P1 已完成，保持本地令牌流程 |
+| base64/data URL 完整性保护 | `crates/veil-engine/src/binary.rs`、`walk.rs` | 已实现 | P0 已完成；多模态和 data URL 原样转发 |
+| base64 图片相关测试 | engine、proxy tests | 已增加并通过 | 引擎和代理回归通过 |
 
 ### 7. 对现有逻辑的影响评估
 
@@ -490,28 +505,28 @@ tag：`v0.3.17`。
 
 1. **base64/data URL 完整性保护**
    - 关注点：多模态请求中的图片、音频或其他二进制内容不应被普通敏感规则改写；
-   - 风险：如果直接合入，需要确认它不会跳过正常文本中的敏感信息；
-   - 建议：先补兼容测试，再决定是否当前合入。
+   - 风险：已通过结构校验、普通文本反例和代理回归测试控制；
+   - 结论：P0 已实现，Base64 内容保持不变，普通文本仍继续扫描。
 
 2. **Bearer/cookie 与管理令牌的统一**
    - 关注点：本地 `localStorage + ?token=` 与上游登录页/cookie/Bearer 会不会形成双重入口；
-   - 风险：错误合并可能导致鉴权绕过、401 回归或令牌泄漏面扩大；
-   - 建议：单独做认证方案设计，先验证登录、Cookie、跨标签页和 CLI 写操作。
+   - 风险：已通过认证优先级、错误令牌和 401 回归测试控制；
+   - 结论：P1 已实现 `x-dgw-admin-token` 和 Bearer 头兼容；登录页/Cookie 未引入。
 
 3. **egress proxy 与 `upstream_proxy` 合并**
    - 关注点：字段名、空值语义、http/https/SOCKS5 支持、管理流量是否直连；
    - 风险：不同默认行为会导致转发链路静默变化；
-   - 建议：先定义统一配置模型，再迁移代码。
+   - 建议：P2 暂不实施；未来先定义统一配置模型，再迁移代码。
 
 4. **ruleset 模块化和 region pack**
    - 关注点：本地 `ruleset_from_config`、规则导入导出、revision 与上游模块化规则集如何整合；
    - 风险：正则校验、内置规则覆盖和配置回退语义可能改变；
-   - 建议：先建立规则加载回归矩阵，再考虑重构。
+   - 建议：P2 暂不实施；先建立规则加载回归矩阵，再考虑重构。
 
 5. **Accept-Language 与 anti-ban 策略**
    - 关注点：这是对上游请求语义和产品定位的变更，不只是普通规则；
    - 风险：默认重写可能影响某些上游、调试结果或用户预期；
-   - 建议：作为独立功能开关评估，不默认合入。
+   - 建议：P2 暂不实施；未来只作为显式开关评估，不默认合入。
 
 #### 7.3 不建议直接执行的操作
 
@@ -539,6 +554,7 @@ tag：`v0.3.17`。
 - 状态显示 `pending_config_change=true` 时，必须重启转发；
 - 停止状态下再次启动会读取最新配置；
 - 生命周期重启只重建数据面，不要求退出管理控制台。
+- 被识别为 Base64 / data URL 的二进制内容不进入普通规则扫描，原样转发；其他字符串继续按现有规则扫描。
 
 #### 8.3 管理令牌与浏览器
 
@@ -547,6 +563,7 @@ tag：`v0.3.17`。
 - 当前启动地址可能带 `?token=`；
 - 当前浏览器令牌使用 `localStorage`，并支持从旧 `sessionStorage` 迁移；
 - 如果管理端口暴露到不可信网络，现有持久化方案需要重新评估。
+- 管理 API 接受 `x-veil-admin-token`、`x-dgw-admin-token`、`Authorization: Bearer <token>` 以及现有 Cookie；认证优先级按实现执行。
 
 ### 9. 后续迭代同步规范
 
@@ -652,18 +669,16 @@ tag：`v0.3.17`。
 
 ### 11. 当前待办与评估队列
 
-#### P0：优先确认是否适合合入
+#### P0/P1：已实现并提交
 
-1. base64/data URL 完整性保护和对应测试；
-2. 上游登录页/Bearer/cookie 与本地 localStorage 令牌方案的安全性对比；
-3. egress proxy、SOCKS5 与本地 `upstream_proxy` 的统一配置设计；
-4. 规则集模块化与本地配置 revision、导入导出语义的兼容性。
+1. [P0] Base64 / data URL / 多模态保护：已完成并通过测试；
+2. [P1] `x-dgw-admin-token` 与 Bearer 头兼容：已完成并通过测试。
 
-#### P1：明确产品需求后再做
+#### 后续评估项：暂不实施
 
-1. region pack；
-2. Accept-Language 重写；
-3. anti-ban 相关文档和默认策略；
+1. egress proxy、SOCKS5 与本地 `upstream_proxy` 的统一配置设计；
+2. region pack 与 Accept-Language 重写；
+3. 登录页与 Cookie 登录流程；
 4. 上游规则集构建方式的进一步模块化。
 
 #### P2：持续维护
@@ -683,5 +698,60 @@ tag：`v0.3.17`。
 - region pack 默认开启是否符合当前项目的实际使用范围和误报要求；
 - Accept-Language 重写是否应默认开启、默认关闭或仅作为显式策略；
 - 上游规则集模块化后，本地规则导入导出、描述字段、revision 冲突和重置行为是否全部保留。
+
+### 13. 2026-11-13 上游 v0.4.1 同步评估（计划）
+
+状态：**P0/P1 已实现并提交，P2/P3/P4 按决策保留**。实现提交为 `b1a89da`；未改变现有令牌流程、配置、代理默认行为或版本号。
+
+计划文档：
+
+- [上游 v0.4.1 对比与安全移植计划](202611/20261113_上游v0.4.1对比与安全移植计划.md)
+- 上游对比版本：`v0.4.1` / `82f9290`
+- 本地分支：`port-upstream-v0.4.1-safety`
+- 计划基线：`39cf272`；功能基线：`bdef91a` / `v0.3.17`
+
+#### 13.1 决策摘要
+
+| 优先级 | 能力 | 决策 | 目的 |
+| --- | --- | --- | --- |
+| P0 | Base64 / data URL / 多模态保护 | 已实现（`b1a89da`） | 防止图片、音频、文件内容被普通脱敏规则改写而损坏 |
+| P1 | `x-dgw-admin-token` 与 Bearer 认证 | 已实现（`b1a89da`） | 修复旧客户端兼容，并支持标准管理客户端 |
+| P2 | 地区规则包、`Accept-Language`、`[egress]` | 暂不实施 | 会改变默认请求语义，且与本地 `upstream_proxy` 重叠 |
+| P3 | 登录页 | 跳过 | 本地已有 `?token=` + `localStorage` 流程 |
+| P4 | README 产品定位调整 | 仅记录 | 属于产品方向决策，不是当前代码兼容性需求 |
+
+#### 13.2 实施边界
+
+- 不整包 merge、rebase 或 cherry-pick 上游；
+- 不覆盖本地生命周期、进程安全、配置 revision、规则管理和令牌持久化逻辑；
+- P0 已完成二进制识别、JSON 字段上下文和非 JSON 原样转发；
+- P1 已完成请求头兼容，未引入上游登录页和 Cookie 写入流程；
+- P2/P3/P4 未获得明确需求前不改默认行为。
+
+#### 13.3 下一步
+
+1. P0 已完成；`cargo test -p veil-engine` 为 50 passed；
+2. P1 已完成；`cargo test -p veil` 为 82 passed；
+3. P0/P1 源码已在 `b1a89da` 提交；文档随本说明提交，保留独立回滚点；
+4. P2/P3/P4 按明确需求另行评估。
+
+#### 13.4 P0/P1 实施记录
+
+| 文件 | 作用 |
+| --- | --- |
+| `crates/veil-engine/src/binary.rs` | 识别 data URL、标准/URL-safe Base64，并进行无分配结构校验 |
+| `crates/veil-engine/src/lib.rs` | 导出 `binary` 模块 |
+| `crates/veil-engine/src/walk.rs` | 传递 JSON key 上下文，保护多模态 `data` 和 data URL |
+| `crates/veil/src/proxy/forward.rs` | 保护非 JSON 的原始 Base64 body |
+| `crates/veil/tests/proxy_core.rs` | 增加多模态 JSON 和原始 Base64 body 集成测试 |
+| `crates/veil/src/admin/auth.rs` | 修复 `x-dgw-admin-token` 并增加 Bearer 请求头提取 |
+| `crates/veil/tests/admin_api.rs` | 增加 Bearer、`x-dgw-admin-token` 和错误令牌集成测试 |
+
+验证结果：
+
+- `cargo test -p veil-engine`：50 passed；
+- `cargo test -p veil`：82 passed；
+- 普通手机号、IP 和密钥规则仍可正常工作；Base64 内容保持不变；
+- `x-dgw-admin-token`、Bearer 和非 loopback 状态请求验证通过。
 
 > 维护原则：先对比行为，再判断收益；先确认兼容性，再决定合入。每次功能迭代、发版和上游同步后，都应在本文档补充对应记录。

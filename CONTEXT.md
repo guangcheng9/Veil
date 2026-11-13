@@ -42,6 +42,8 @@ The caller that points its Base URL at the gateway. v1 first-party client is Cla
 
 On the request path, the gateway matches sensitive values with rules (regex and dictionaries) and replaces them with placeholders before the request leaves the trust boundary. Original plaintext must not go to the upstream. Only string values in the body are eligible for replacement. Headers, query, path, method, status, and JSON keys are forwarded unchanged.
 
+Opaque multimodal payloads identified as Base64 blobs, data URLs, or explicit binary fields are forwarded unchanged so secret rules cannot corrupt the encoded content. Ordinary string values remain eligible for replacement; the exception and its validation rules are documented in the local iteration plan.
+
 ## 下行还原（Inbound Restoration）
 
 On the response path, the gateway replaces placeholders in the model output with the original plaintext using the mapping table. Restoration applies only to string values in the body / SSE payload, never to headers.
@@ -117,6 +119,8 @@ A separate listen port that serves the Management UI and management APIs. It is 
 ## Admin Token（管理令牌）
 
 A secret required to change gateway configuration through the Management Port. Desktop Mode may bind the Management Port to localhost. Server Mode may bind the Proxy Port to the internal network, but binding the Management Port beyond localhost requires an Admin Token.
+
+The management API accepts `x-veil-admin-token`, `x-dgw-admin-token`, `Authorization: Bearer <token>`, and the existing `veil_admin` / `dgw_admin` cookies. A loopback-only status read may be unauthenticated; mutating and non-loopback management requests require a valid token.
 
 ## Management UI（管理界面）
 
